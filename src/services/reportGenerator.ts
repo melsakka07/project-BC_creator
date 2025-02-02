@@ -17,32 +17,25 @@ export class ReportGenerator extends BaseAgent {
   }
 
   async generateReport(data: BusinessCase): Promise<BusinessCaseReport> {
-    try {
-      // Initialize report sections
-      for (const section of reportSections) {
-        this.report[section.id as keyof BusinessCaseReport] = {
-          status: 'loading',
-          content: ''
-        };
-      }
-
-      // Generate each section in parallel
-      const promises = [
-        this.generateExecutiveSummary(data),
-        this.generateFinancialAnalysis(data),
-        this.generateMarketResearch(data),
-        this.generateRiskAssessment(data),
-        this.generateSummaryConclusion(data)
-      ];
-
-      await Promise.all(promises);
-
-      return this.report as BusinessCaseReport;
-
-    } catch (error) {
-      console.error('Error generating report:', error);
-      throw new Error('Failed to generate business case report');
+    // Initialize all sections as loading
+    for (const section of reportSections) {
+      this.report[section.id as keyof BusinessCaseReport] = {
+        status: 'loading',
+        content: ''
+      };
     }
+
+    // Generate all sections in parallel
+    const promises = [
+      this.generateExecutiveSummary(data),
+      this.generateFinancialAnalysis(data),
+      this.generateMarketResearch(data),
+      this.generateRiskAssessment(data),
+      this.generateSummaryConclusion(data)
+    ];
+
+    await Promise.all(promises);
+    return this.report as BusinessCaseReport;
   }
 
   private async generateExecutiveSummary(data: BusinessCase): Promise<void> {
