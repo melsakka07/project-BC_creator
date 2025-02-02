@@ -119,7 +119,7 @@ export default function InputForm({ onSubmit, isLoading, parameters, onParameter
     },
     {
       name: 'opex',
-      label: 'Annual Operating Expenses (OpEx)',
+      label: 'Annual (OpEx)',
       icon: TrendingUp,
       type: 'number',
       placeholder: 'e.g., 500000',
@@ -315,7 +315,7 @@ export default function InputForm({ onSubmit, isLoading, parameters, onParameter
           >
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-neutral-500 dark:text-neutral-400" />
-              Investment Period (Years)
+              Overall Investment Period Projected in(Years) 
               <Tooltip content={{
                 title: 'Investment Timeline',
                 description: 'The number of years over which the business case will be evaluated'
