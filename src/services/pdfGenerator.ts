@@ -1,22 +1,45 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import type { BusinessCaseReport } from '../types';
 import { reportSections } from '../config/reportSections';
-import { Chart } from 'chart.js';
 
-export class PdfGenerator {
+interface PDFOptions {
+  margin: number;
+  pageWidth: number;
+  pageHeight: number;
+  contentWidth: number;
+  lineHeight: number;
+  fontSize: number;
+  headerFontSize: number;
+  subheaderFontSize: number;
+  textColor: string;
+  headerColor: string;
+  accentColor: string;
+}
+
+interface Colors {
+  primary: [number, number, number];
+  secondary: [number, number, number];
+  neutral: {
+    800: [number, number, number];
+    700: [number, number, number];
+    600: [number, number, number];
+  };
+}
+
+export class PDFGenerator {
   private pdf: jsPDF;
+  private options: PDFOptions;
   private currentY: number;
-  private pageHeight: number;
-  private pageWidth: number;
   private margins = {
     top: 25,
     bottom: 25,
     left: 25,
     right: 25
   };
-  private colors = {
-    primary: [2, 132, 199], // primary-600
-    secondary: [201, 38, 211], // secondary-600
+  private colors: Colors = {
+    primary: [2, 132, 199],
+    secondary: [201, 38, 211],
     neutral: {
       800: [39, 39, 42],
       700: [63, 63, 70],
@@ -29,35 +52,43 @@ export class PdfGenerator {
     italic: 'helvetica-oblique'
   };
   private pageNumber: number = 1;
-  private totalPages: number = 1;
   private tableOfContents: { title: string; page: number }[] = [];
 
   constructor() {
     this.pdf = new jsPDF({
       orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-      compress: true
+      unit: 'pt',
+      format: 'a4'
     });
-    this.pageHeight = this.pdf.internal.pageSize.height;
-    this.pageWidth = this.pdf.internal.pageSize.width;
-    this.currentY = this.margins.top;
 
-    // Set default font
-    this.pdf.setFont(this.fonts.regular);
+    this.options = {
+      margin: 50,
+      pageWidth: 595.28,
+      pageHeight: 841.89,
+      contentWidth: 495.28,
+      lineHeight: 1.5,
+      fontSize: 11,
+      headerFontSize: 24,
+      subheaderFontSize: 16,
+      textColor: '#374151',
+      headerColor: '#111827',
+      accentColor: '#4F46E5'
+    };
+
+    this.currentY = this.options.margin;
   }
 
   private addCoverPage(title: string) {
-    // Add gradient background
-    const gradient = this.pdf.setFillColor(this.colors.primary[0], this.colors.primary[1], this.colors.primary[2]);
-    this.pdf.rect(0, 0, this.pageWidth, 80, 'F');
+    // Add background color
+    this.pdf.setFillColor(this.colors.primary[0], this.colors.primary[1], this.colors.primary[2]);
+    this.pdf.rect(0, 0, this.options.pageWidth, 80, 'F');
 
     // Add title
     this.pdf.setFont(this.fonts.bold);
     this.pdf.setFontSize(32);
     this.pdf.setTextColor(255, 255, 255);
     const titleWidth = this.pdf.getTextWidth(title);
-    const centerX = (this.pageWidth - titleWidth) / 2;
+    const centerX = (this.options.pageWidth - titleWidth) / 2;
     this.pdf.text(title, centerX, 50);
 
     // Add date
@@ -69,7 +100,7 @@ export class PdfGenerator {
       day: 'numeric'
     });
     const dateWidth = this.pdf.getTextWidth(date);
-    this.pdf.text(date, (this.pageWidth - dateWidth) / 2, 65);
+    this.pdf.text(date, (this.options.pageWidth - dateWidth) / 2, 65);
 
     this.pdf.addPage();
     this.currentY = this.margins.top;
@@ -86,13 +117,12 @@ export class PdfGenerator {
     this.pdf.setFontSize(12);
     this.pdf.setTextColor(...this.colors.neutral[700]);
 
-    this.tableOfContents.forEach((item, index) => {
+    this.tableOfContents.forEach(item => {
       const dots = '.'.repeat(50);
       const pageNum = item.page.toString();
-      const lineWidth = this.pdf.getTextWidth(`${item.title} ${dots} ${pageNum}`);
       
       this.pdf.text(item.title, this.margins.left, this.currentY);
-      this.pdf.text(pageNum, this.pageWidth - this.margins.right - this.pdf.getTextWidth(pageNum), this.currentY);
+      this.pdf.text(pageNum, this.options.pageWidth - this.margins.right - this.pdf.getTextWidth(pageNum), this.currentY);
       this.pdf.text(dots, this.margins.left + this.pdf.getTextWidth(item.title + ' '), this.currentY);
       
       this.currentY += 10;
@@ -106,7 +136,7 @@ export class PdfGenerator {
     this.pdf.setFont(this.fonts.regular);
     this.pdf.setFontSize(8);
     this.pdf.setTextColor(...this.colors.neutral[600]);
-    this.pdf.text(`Page ${pageNumber}`, this.pageWidth - this.margins.right - 15, 15);
+    this.pdf.text(`Page ${pageNumber}`, this.options.pageWidth - this.margins.right - 15, 15);
   }
 
   private addFooter() {
@@ -114,7 +144,7 @@ export class PdfGenerator {
     this.pdf.setFont(this.fonts.italic);
     this.pdf.setFontSize(8);
     this.pdf.setTextColor(...this.colors.neutral[600]);
-    this.pdf.text(footerText, this.margins.left, this.pageHeight - 10);
+    this.pdf.text(footerText, this.margins.left, this.options.pageHeight - 10);
   }
 
   private async addChart(chart: HTMLCanvasElement, title: string) {
@@ -124,7 +154,7 @@ export class PdfGenerator {
     const imageData = chart.toDataURL('image/png', 1.0);
     
     // Calculate dimensions to maintain aspect ratio
-    const maxWidth = this.pageWidth - this.margins.left - this.margins.right;
+    const maxWidth = this.options.pageWidth - this.margins.left - this.margins.right;
     const maxHeight = 100; // Maximum height for charts
     const aspectRatio = chart.width / chart.height;
     let width = maxWidth;
@@ -190,7 +220,7 @@ export class PdfGenerator {
     this.pdf.setFontSize(11);
     this.pdf.setTextColor(...this.colors.neutral[700]);
 
-    const maxWidth = this.pageWidth - this.margins.left - this.margins.right;
+    const maxWidth = this.options.pageWidth - this.margins.left - this.margins.right;
     const lines = this.pdf.splitTextToSize(text, maxWidth);
 
     lines.forEach((line: string) => {
@@ -208,7 +238,7 @@ export class PdfGenerator {
     this.pdf.text('•', indent, this.currentY);
     
     const bulletWidth = this.pdf.getTextWidth('• ');
-    const maxWidth = this.pageWidth - indent - this.margins.right - bulletWidth;
+    const maxWidth = this.options.pageWidth - indent - this.margins.right - bulletWidth;
     const lines = this.pdf.splitTextToSize(text, maxWidth);
 
     lines.forEach((line: string, index: number) => {
@@ -219,7 +249,7 @@ export class PdfGenerator {
   }
 
   private checkAndAddPage() {
-    if (this.currentY > this.pageHeight - this.margins.bottom) {
+    if (this.currentY > this.options.pageHeight - this.margins.bottom) {
       this.pdf.addPage();
       this.pageNumber++;
       this.currentY = this.margins.top;
@@ -236,7 +266,7 @@ export class PdfGenerator {
     this.pdf.line(
       this.margins.left,
       this.currentY,
-      this.pageWidth - this.margins.right,
+      this.options.pageWidth - this.margins.right,
       this.currentY
     );
     this.currentY += 10;
@@ -276,7 +306,7 @@ export class PdfGenerator {
 
     // Process each section
     for (const section of reportSections) {
-      const response = report[section.id];
+      const response = report[section.id as keyof BusinessCaseReport];
       
       if (response.status === 'complete') {
         // Add section title
@@ -312,13 +342,22 @@ export class PdfGenerator {
       }
     }
 
-    // Add table of contents after processing all sections
-    this.totalPages = this.pageNumber;
+    // Update table of contents
     this.pdf.setPage(1);
     this.currentY = this.margins.top;
     this.addTableOfContents();
 
     // Save the PDF
     this.pdf.save('business-case-report.pdf');
+  }
+
+  protected addText(text: string) {
+    this.checkAndAddPage();
+    this.pdf.text(text, this.margins.left, this.currentY);
+    this.currentY += this.options.lineHeight * this.options.fontSize;
+  }
+
+  protected addSpacing() {
+    this.currentY += this.options.lineHeight * this.options.fontSize;
   }
 }

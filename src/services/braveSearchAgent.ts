@@ -1,4 +1,5 @@
 import type { BusinessCase } from '../types';
+import { env } from '../config/env';
 
 interface SearchResult {
   title: string;
@@ -15,31 +16,19 @@ interface BraveSearchResponse {
 
 export class BraveSearchAgent {
   private apiKey: string;
-  private apiEndpoint: string;
   private isConfigured: boolean;
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_BRAVE_API_KEY;
-    this.apiEndpoint = import.meta.env.VITE_BRAVE_API_ENDPOINT;
-    this.isConfigured = this.validateConfiguration();
+    this.apiKey = env.BRAVE_API_KEY;
+    this.isConfigured = Boolean(this.apiKey && this.apiKey !== 'your_brave_api_key_here');
     
     if (!this.isConfigured) {
       console.warn('Brave Search API is not properly configured. Please check your .env file.');
     }
   }
 
-  private validateConfiguration(): boolean {
-    if (!this.apiKey || !this.apiEndpoint) {
-      console.error('Brave Search API configuration is missing. Please check your .env file.');
-      return false;
-    }
-
-    if (this.apiKey === 'your_brave_api_key_here') {
-      console.error('Please replace the placeholder with your actual Brave Search API key in the .env file.');
-      return false;
-    }
-
-    return true;
+  public checkConfiguration(): boolean {
+    return this.isConfigured;
   }
 
   private async searchBrave(query: string): Promise<SearchResult[]> {

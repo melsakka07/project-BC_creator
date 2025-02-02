@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Brain, Loader2, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Brain, Loader2 } from 'lucide-react';
 import { ExecutiveSummaryAgent } from '../services/agents/executiveSummaryAgent';
 import { FinancialAnalysisAgent } from '../services/agents/financialAnalysisAgent';
 import { MarketResearchAgent } from '../services/agents/marketResearchAgent';
@@ -19,12 +19,6 @@ const testCase: BusinessCase = {
   growthRate: 15,
   arpu: 50
 };
-
-interface AgentTestProps {
-  agentName: string;
-  agent: ExecutiveSummaryAgent;
-  testCase: BusinessCase;
-}
 
 export default function AgentTest() {
   const [isLoading, setIsLoading] = useState(false);
@@ -68,10 +62,10 @@ export default function AgentTest() {
           AI Agent Testing Interface
         </h2>
 
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-6">
           <button
             onClick={() => setActiveAgent('executive')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 min-w-[160px] px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${activeAgent === 'executive'
                 ? 'bg-primary-600 text-white'
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'}`}
@@ -80,7 +74,7 @@ export default function AgentTest() {
           </button>
           <button
             onClick={() => setActiveAgent('financial')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 min-w-[160px] px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${activeAgent === 'financial'
                 ? 'bg-primary-600 text-white'
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'}`}
@@ -89,7 +83,7 @@ export default function AgentTest() {
           </button>
           <button
             onClick={() => setActiveAgent('market')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 min-w-[160px] px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${activeAgent === 'market'
                 ? 'bg-primary-600 text-white'
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'}`}
@@ -98,7 +92,7 @@ export default function AgentTest() {
           </button>
           <button
             onClick={() => setActiveAgent('risk')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex-1 min-w-[160px] px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${activeAgent === 'risk'
                 ? 'bg-primary-600 text-white'
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'}`}
@@ -117,9 +111,9 @@ export default function AgentTest() {
         <button
           onClick={handleTest}
           disabled={isLoading}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg
-            text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2
-            focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent 
+            text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none 
+            focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading && (
             <>

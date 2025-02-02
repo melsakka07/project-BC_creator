@@ -1,134 +1,120 @@
+import { BaseAgent } from './agents/baseAgent';
 import type { BusinessCase } from '../types';
-import { formatCurrency, formatPercentage, formatNumber } from '../utils/responseHelpers';
+import { formatCurrency, formatPercentage } from '../utils/responseHelpers';
 import { MARKET_DATA } from '../config/marketData';
-import { BraveSearchAgent } from './braveSearchAgent';
+import type { Industry } from '../config/industries';
 
-interface MarketTrend {
-  trend: string;
-  impact: 'positive' | 'negative' | 'neutral';
-  description: string;
-}
+const SYSTEM_PROMPT = `You are an expert market research analyst specializing in industry analysis. 
+Create a comprehensive market research report using the following structure:
+<div class="space-y-8">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-neutral-800">Market Research Report</h2>
+      <p class="text-neutral-600">[Company Name] - [Project Name]</p>
+    </div>
+  </div>
+  
+  <div class="bg-white/50 rounded-xl p-6 backdrop-blur-sm">
+    <h3 class="text-lg font-semibold text-neutral-800 mb-4">Market Overview</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="p-4 bg-neutral-50 rounded-lg">
+        <h4 class="font-medium text-neutral-800 mb-2">Market Size & Growth</h4>
+        [Market size and growth metrics]
+      </div>
+      <div class="p-4 bg-neutral-50 rounded-lg">
+        <h4 class="font-medium text-neutral-800 mb-2">Industry Dynamics</h4>
+        [Industry dynamics and indicators]
+      </div>
+    </div>
+  </div>
 
-interface CompetitorInfo {
-  name: string;
-  marketShare: number;
-  strengths: string[];
-}
+  <div class="bg-white/50 rounded-xl p-6 backdrop-blur-sm">
+    <h3 class="text-lg font-semibold text-neutral-800 mb-4">Market Analysis</h3>
+    <div class="prose prose-sm text-neutral-600">
+      [Detailed market analysis]
+    </div>
+  </div>
+</div>`;
 
-interface MarketResearchData {
+interface MarketData {
   marketSize: number;
   growthRate: number;
-  trends: MarketTrend[];
-  competitors: CompetitorInfo[];
-  opportunities: string[];
-  threats: string[];
+  trends: ReadonlyArray<{ trend: string; impact: string; description: string }>;
+  competitors: ReadonlyArray<{ name: string; marketShare: number; strengths: ReadonlyArray<string> }>;
+  opportunities: ReadonlyArray<string>;
+  threats: ReadonlyArray<string>;
 }
 
-export class MarketResearchAgent {
-  private braveSearchAgent: BraveSearchAgent;
-
+export class MarketResearchAgent extends BaseAgent {
   constructor() {
-    this.braveSearchAgent = new BraveSearchAgent();
-  }
-
-  private simulateAPICall(industry: string, country: string): Promise<MarketResearchData> {
-    // Simulate API latency
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Simulate market research data based on industry and country
-        const data: MarketResearchData = {
-          marketSize: this.generateMarketSize(industry),
-          growthRate: this.generateGrowthRate(industry),
-          trends: this.generateTrends(industry),
-          competitors: this.generateCompetitors(industry),
-          opportunities: this.generateOpportunities(industry, country),
-          threats: this.generateThreats(industry)
-        };
-        resolve(data);
-      }, 1500);
-    });
-  }
-
-  private generateMarketSize(industry: string): number {
-    return (MARKET_DATA.marketSizes[industry] || MARKET_DATA.defaultMarketSize) * 1e9;
-  }
-
-  private generateGrowthRate(industry: string): number {
-    return MARKET_DATA.growthRates[industry] || MARKET_DATA.defaultGrowthRate;
-  }
-
-  private generateTrends(industry: string): MarketTrend[] {
-    return MARKET_DATA.trends[industry] || MARKET_DATA.defaultTrends;
-  }
-
-  private generateCompetitors(industry: string): CompetitorInfo[] {
-    return MARKET_DATA.competitors[industry] || MARKET_DATA.defaultCompetitors;
-  }
-
-  private generateOpportunities(industry: string, country: string): string[] {
-    const baseOpportunities = MARKET_DATA.opportunities[industry] || MARKET_DATA.defaultOpportunities;
-    return baseOpportunities.map(opp => opp.replace('${country}', country));
-  }
-
-  private generateThreats(industry: string): string[] {
-    return MARKET_DATA.threats[industry] || MARKET_DATA.defaultThreats;
-  }
-
-  private calculateMarketMetrics(data: BusinessCase, research: MarketResearchData) {
-    const initialMarketShare = (data.subscribers * 100) / (research.marketSize / (data.arpu * 12));
-    const targetMarketShare = (data.subscribers * (1 + data.growthRate / 100) * 100) / (research.marketSize / (data.arpu * 12));
-    
-    return {
-      initialMarketShare,
-      targetMarketShare
-    };
+    super(SYSTEM_PROMPT);
   }
 
   async generateMarketResearch(data: BusinessCase): Promise<string> {
-    const research = await this.simulateAPICall(data.industry, data.country);
-    const { initialMarketShare, targetMarketShare } = this.calculateMarketMetrics(data, research);
-    const marketInsights = await this.braveSearchAgent.searchMarketInsights(data);
-    
-    return `Market Research Analysis for ${data.companyName} in ${data.country}:
+    try {
+      const marketData = this.getMarketData(data.industry);
+      
+      const formattedMarketSize = formatCurrency(marketData.marketSize * 1000000);
+      const formattedGrowthRate = formatPercentage(marketData.growthRate);
 
-Industry Overview:
-• Market Size: ${formatCurrency(research.marketSize / 1e9)} billion
-• Industry Growth Rate: ${formatPercentage(research.growthRate)} annually
-• Company's Target Growth: ${formatPercentage(data.growthRate)} annually
-• Market Position: ${formatNumber(data.subscribers)} current subscribers
+      const prompt = `Generate a market research report for:
+Company: ${data.companyName}
+Project: ${data.projectName}
+Industry: ${data.industry}
+Country: ${data.country}
 
-Market Trends:
-${research.trends.map(trend => `• ${trend.trend} (${trend.impact})
-  - ${trend.description}`).join('\n')}
+Market Data:
+- Market Size: ${formattedMarketSize}
+- Growth Rate: ${formattedGrowthRate}
+- Key Trends: ${marketData.trends.map(t => t.trend).join(', ')}
+- Competitors: ${marketData.competitors.map(c => c.name).join(', ')}
 
-Competitive Landscape:
-${research.competitors.map(competitor => `• ${competitor.name}
-  - Market Share: ${formatPercentage(competitor.marketShare)}
-  - Key Strengths: ${competitor.strengths.join(', ')}`).join('\n')}
+Include analysis of:
+1. Market size and growth potential
+2. Competitive landscape
+3. Key market trends
+4. Growth opportunities
+5. Potential threats`;
 
-Market Entry Analysis:
-• Initial Market Share: ${formatPercentage(initialMarketShare)}
-• Target Market Share: ${formatPercentage(targetMarketShare)}
-• ARPU Positioning: ${formatCurrency(data.arpu)}/month
+      const analysis = await this.generateCompletion([
+        { role: 'user', content: prompt }
+      ], 0.7);
 
-Opportunities:
-${research.opportunities.map(opportunity => `• ${opportunity}`).join('\n')}
+      return analysis;
 
-Threats:
-${research.threats.map(threat => `• ${threat}`).join('\n')}
+    } catch (error) {
+      console.error('Error generating market research:', error);
+      throw new Error('Failed to generate market research analysis');
+    }
+  }
 
-Market Entry Strategy:
-• Investment: ${formatCurrency(data.capex)} initial capital
-• Operating Cost: ${formatCurrency(data.opex)} annual
-• Timeline: ${data.investmentPeriod} ${data.investmentPeriod === 1 ? 'year' : 'years'}
+  private getMarketData(industry: Industry): MarketData {
+    if (industry === '') {
+      return {
+        marketSize: MARKET_DATA.defaultMarketSize,
+        growthRate: MARKET_DATA.defaultGrowthRate,
+        trends: MARKET_DATA.defaultTrends,
+        competitors: MARKET_DATA.defaultCompetitors,
+        opportunities: MARKET_DATA.defaultOpportunities,
+        threats: MARKET_DATA.defaultThreats
+      };
+    }
 
-Strategic Recommendations:
-1. Focus on ${research.trends[0]?.trend.toLowerCase() || 'market trends'} to drive growth
-2. Target competitive advantage in ${research.competitors[0]?.strengths[0].toLowerCase() || 'key areas'}
-3. Leverage ${formatCurrency(data.arpu)} ARPU positioning for market penetration
-4. Implement phased growth strategy targeting ${formatPercentage(data.growthRate)} annual growth
+    // Cast market data with proper types
+    const marketSizes = MARKET_DATA.marketSizes as { [K in Industry]: number };
+    const growthRates = MARKET_DATA.growthRates as { [K in Industry]: number };
+    const trends = MARKET_DATA.trends as unknown as { [K in Industry]?: typeof MARKET_DATA.defaultTrends };
+    const competitors = MARKET_DATA.competitors as unknown as { [K in Industry]?: typeof MARKET_DATA.defaultCompetitors };
+    const opportunities = MARKET_DATA.opportunities as unknown as { [K in Industry]?: typeof MARKET_DATA.defaultOpportunities };
+    const threats = MARKET_DATA.threats as unknown as { [K in Industry]?: typeof MARKET_DATA.defaultThreats };
 
-Market Insights from Web Research:
-${marketInsights}`;
+    return {
+      marketSize: marketSizes[industry] ?? MARKET_DATA.defaultMarketSize,
+      growthRate: growthRates[industry] ?? MARKET_DATA.defaultGrowthRate,
+      trends: trends[industry] ?? MARKET_DATA.defaultTrends,
+      competitors: competitors[industry] ?? MARKET_DATA.defaultCompetitors,
+      opportunities: opportunities[industry] ?? MARKET_DATA.defaultOpportunities,
+      threats: threats[industry] ?? MARKET_DATA.defaultThreats
+    };
   }
 }

@@ -1,5 +1,3 @@
-import type { MarketTrend, CompetitorInfo } from '../types/market';
-
 export const MARKET_DATA = {
   marketSizes: {
     'Technology & Software': 500,
@@ -129,5 +127,24 @@ export const MARKET_DATA = {
     'Competitive pressure',
     'Regulatory changes',
     'Economic uncertainties'
-  ]
+  ],
+
+  technologyAndSoftware: {
+    marketSize: 5200000000000, // $5.2T
+    growthRate: 10.5,
+    keyPlayers: [
+      'Microsoft',
+      'Apple',
+      'Amazon',
+      'Google',
+      'Meta'
+    ],
+    trends: [
+      'Cloud Computing',
+      'Artificial Intelligence',
+      'Cybersecurity',
+      'Digital Transformation',
+      'Remote Work Solutions'
+    ]
+  },
 } as const;

@@ -1,8 +1,8 @@
 import { BaseAgent } from './baseAgent';
 import type { BusinessCase } from '../../types';
-import { formatCurrency, formatNumber, formatPercentage } from '../../utils/responseHelpers';
+import { formatCurrency, formatPercentage } from '../../utils/responseHelpers';
 import { MARKET_DATA } from '../../config/marketData';
-import { BraveSearchAgent } from '../braveSearchAgent';
+import type { Industry } from '../../config/industries';
 
 const SYSTEM_PROMPT = `You are an expert market research analyst specializing in industry analysis. 
 Create a comprehensive market research report using the following structure:
@@ -77,76 +77,103 @@ Create a comprehensive market research report using the following structure:
 
 Important: Do not include any markdown code block indicators in your response.`;
 
-export class MarketResearchAgent extends BaseAgent {
-  private braveSearchAgent: BraveSearchAgent;
+interface MarketData {
+  marketSize: number;
+  growthRate: number;
+  trends: ReadonlyArray<{ trend: string; impact: string; description: string }>;
+  competitors: ReadonlyArray<{ name: string; marketShare: number; strengths: ReadonlyArray<string> }>;
+  opportunities: ReadonlyArray<string>;
+  threats: ReadonlyArray<string>;
+}
 
+export class MarketResearchAgent extends BaseAgent {
   constructor() {
     super(SYSTEM_PROMPT);
-    this.braveSearchAgent = new BraveSearchAgent();
-  }
-
-  private async getMarketData(data: BusinessCase) {
-    const marketSize = MARKET_DATA.marketSizes[data.industry] || MARKET_DATA.defaultMarketSize;
-    const growthRate = MARKET_DATA.growthRates[data.industry] || MARKET_DATA.defaultGrowthRate;
-    const trends = MARKET_DATA.trends[data.industry] || MARKET_DATA.defaultTrends;
-    const competitors = MARKET_DATA.competitors[data.industry] || MARKET_DATA.defaultCompetitors;
-    const opportunities = MARKET_DATA.opportunities[data.industry] || MARKET_DATA.defaultOpportunities;
-    const threats = MARKET_DATA.threats[data.industry] || MARKET_DATA.defaultThreats;
-
-    // Get real-time market insights with error handling
-    let marketInsights = '';
-    try {
-      marketInsights = await this.braveSearchAgent.searchMarketInsights(data);
-    } catch (error) {
-      console.error('Error fetching market insights:', error);
-      marketInsights = this.braveSearchAgent.getFallbackInsights();
-    }
-
-    return {
-      marketSize,
-      growthRate,
-      trends,
-      competitors,
-      opportunities,
-      threats,
-      marketInsights
-    };
-  }
-
-  private calculateMarketMetrics(data: BusinessCase, marketSize: number) {
-    const totalAddressableMarket = marketSize * 1e9;
-    const initialMarketShare = (data.subscribers * data.arpu * 12) / totalAddressableMarket * 100;
-    const finalSubscribers = Math.round(data.subscribers * (1 + (data.growthRate / 100) * data.investmentPeriod));
-    const finalMarketShare = (finalSubscribers * data.arpu * 12) / totalAddressableMarket * 100;
-    
-    return {
-      totalAddressableMarket,
-      initialMarketShare,
-      finalMarketShare,
-      finalSubscribers
-    };
   }
 
   async generateMarketResearch(data: BusinessCase): Promise<string> {
-    const research = await this.getMarketData(data);
-    const { initialMarketShare, targetMarketShare } = this.calculateMarketMetrics(data, research);
-    
-    return `Market Research Analysis for ${data.companyName} in ${data.country}:
+    try {
+      // Get market data with fallbacks
+      const marketData = this.getMarketData(data.industry);
+      
+      // Format market size to billions/millions for readability
+      const formattedMarketSize = formatCurrency(marketData.marketSize * 1000000);
+      const formattedGrowthRate = formatPercentage(marketData.growthRate);
 
-Threats:
-${research.threats.map(threat => `• ${threat}`).join('\n')}
+      const prompt = `Generate a market research report for:
+Company: ${data.companyName}
+Project: ${data.projectName}
+Industry: ${data.industry}
+Country: ${data.country}
 
-Real-Time Market Research:
-${research.marketInsights}
+Market Data:
+- Market Size: ${formattedMarketSize}
+- Growth Rate: ${formattedGrowthRate}
+- Key Trends: ${marketData.trends.map(t => t.trend).join(', ')}
+- Competitors: ${marketData.competitors.map(c => c.name).join(', ')}
 
-Market Entry Strategy:
-• Investment: ${formatCurrency(data.capex)} initial capital
-• Operating Cost: ${formatCurrency(data.opex)} annual
+Include analysis of:
+1. Market size and growth potential
+2. Competitive landscape
+3. Key market trends
+4. Growth opportunities
+5. Potential threats`;
 
-Strategy Recommendations:
-1. Focus on ${research.trends[0]?.trend.toLowerCase() || 'market trends'} to drive growth
-2. Target competitive advantage in ${research.competitors[0]?.strengths[0].toLowerCase() || 'key areas'}
-3. Leverage ${formatCurrency(data.arpu)} ARPU positioning for market penetration
-4. Implement phased growth strategy targeting ${formatPercentage(data.growthRate)} annual growth`;
+      const analysis = await this.generateCompletion([
+        { role: 'user', content: prompt }
+      ], 0.7);
+
+      return analysis;
+
+    } catch (error) {
+      console.error('Error generating market research:', error);
+      throw new Error('Failed to generate market research analysis');
+    }
+  }
+
+  private getMarketData(industry: Industry): MarketData {
+    // Handle empty string case by using default values
+    if (industry === '') {
+      return {
+        marketSize: MARKET_DATA.defaultMarketSize,
+        growthRate: MARKET_DATA.defaultGrowthRate,
+        trends: MARKET_DATA.defaultTrends,
+        competitors: MARKET_DATA.defaultCompetitors,
+        opportunities: MARKET_DATA.defaultOpportunities,
+        threats: MARKET_DATA.defaultThreats
+      };
+    }
+
+    // Get industry-specific data with fallbacks
+    const marketSizes = MARKET_DATA.marketSizes as { [K in Industry]: number };
+    const growthRates = MARKET_DATA.growthRates as { [K in Industry]: number };
+
+    // Cast the entire trends object to allow safe indexing
+    const trendsData = MARKET_DATA.trends as unknown as { 
+      [K in Industry]?: ReadonlyArray<{ trend: string; impact: string; description: string }> 
+    };
+
+    // Cast the competitors object
+    const competitorsData = MARKET_DATA.competitors as unknown as {
+      [K in Industry]?: ReadonlyArray<{ name: string; marketShare: number; strengths: ReadonlyArray<string> }>
+    };
+
+    // Cast the opportunities and threats objects
+    const opportunitiesData = MARKET_DATA.opportunities as unknown as {
+      [K in Industry]?: ReadonlyArray<string>
+    };
+
+    const threatsData = MARKET_DATA.threats as unknown as {
+      [K in Industry]?: ReadonlyArray<string>
+    };
+
+    return {
+      marketSize: marketSizes[industry] ?? MARKET_DATA.defaultMarketSize,
+      growthRate: growthRates[industry] ?? MARKET_DATA.defaultGrowthRate,
+      trends: trendsData[industry] ?? MARKET_DATA.defaultTrends,
+      competitors: competitorsData[industry] ?? MARKET_DATA.defaultCompetitors,
+      opportunities: opportunitiesData[industry] ?? MARKET_DATA.defaultOpportunities,
+      threats: threatsData[industry] ?? MARKET_DATA.defaultThreats
+    };
   }
 }

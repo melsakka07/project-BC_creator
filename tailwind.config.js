@@ -3,49 +3,39 @@ import typography from '@tailwindcss/typography'
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          400: '#60A5FA',
+          500: '#3B82F6',
+          600: '#2563EB',
         },
         secondary: {
-          50: '#fdf4ff',
-          100: '#fae8ff',
-          200: '#f5d0fe',
-          300: '#f0abfc',
-          400: '#e879f9',
-          500: '#d946ef',
-          600: '#c026d3',
-          700: '#a21caf',
-          800: '#86198f',
-          900: '#701a75',
+          400: '#A78BFA',
+          500: '#8B5CF6',
+          600: '#7C3AED',
         },
         neutral: {
-          50: '#fafafa',
-          100: '#f4f4f5',
-          200: '#e4e4e7',
-          300: '#d4d4d8',
-          400: '#a1a1aa',
-          500: '#71717a',
-          600: '#52525b',
-          700: '#3f3f46',
-          800: '#27272a',
-          900: '#18181b',
+          50: '#F8FAFC',
+          100: '#F1F5F9',
+          200: '#E2E8F0',
+          300: '#CBD5E1',
+          400: '#94A3B8',
+          500: '#64748B',
+          600: '#475569',
+          700: '#334155',
+          800: '#1E293B',
+          900: '#0F172A',
         },
       },
       animation: {
-        'gradient': 'gradient 8s linear infinite',
-        'float': 'float 3s ease-in-out infinite',
+        gradient: 'gradient 8s ease infinite',
+        float: 'float 6s ease-in-out infinite',
+        fadeIn: 'fadeIn 0.5s ease-out',
+        scaleIn: 'scaleIn 0.2s ease-out',
+        slideIn: 'slideIn 0.2s ease-out',
       },
       keyframes: {
         gradient: {
@@ -62,10 +52,54 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' },
         },
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(10px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          from: { transform: 'scale(0.95)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
+        slideIn: {
+          from: { transform: 'translateX(-10px)', opacity: '0' },
+          to: { transform: 'translateX(0)', opacity: '1' },
+        },
       },
+      typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            maxWidth: 'none',
+            color: theme('colors.neutral.700'),
+            fontSize: '0.875rem',
+            lineHeight: '1.5rem',
+            p: {
+              marginTop: '0.75em',
+              marginBottom: '0.75em',
+            },
+            'h1, h2, h3, h4': {
+              marginTop: '1.5em',
+              marginBottom: '0.75em',
+            },
+            ul: {
+              marginTop: '0.5em',
+              marginBottom: '0.5em',
+            },
+            li: {
+              marginTop: '0.25em',
+              marginBottom: '0.25em',
+            },
+          },
+        },
+        sm: {
+          css: {
+            fontSize: '0.8125rem',
+            lineHeight: '1.4rem',
+          },
+        },
+      }),
     },
   },
   plugins: [
-    typography(),
+    typography,
   ],
-};
+}

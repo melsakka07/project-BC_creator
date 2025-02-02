@@ -1,4 +1,5 @@
 export const industries = [
+  '',  // Add empty option for "Select an industry"
   'Technology & Software',
   'Healthcare & Pharmaceuticals',
   'Financial Services & Banking',

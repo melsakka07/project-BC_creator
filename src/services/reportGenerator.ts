@@ -1,72 +1,93 @@
-import type { BusinessCase, BusinessCaseReport, AgentResponse } from '../types';
-import type { ReportSectionConfig } from '../types/report';
-import { reportSections } from '../config/reportSections';
-import { formatCurrency, formatNumber, formatPercentage } from '../utils/responseHelpers';
-import { ExecutiveSummaryAgent } from './agents/executiveSummaryAgent';
-import { FinancialAnalysisAgent } from './agents/financialAnalysisAgent';
+import type { BusinessCase, BusinessCaseReport } from '../types';
+import { BaseAgent } from './agents/baseAgent';
 import { MarketResearchAgent } from './agents/marketResearchAgent';
 import { RiskAssessmentAgent } from './agents/riskAssessmentAgent';
-import { createAgentResponse } from '../utils/responseHelpers';
+import { reportSections } from '../config/reportSections';
+import { formatCurrency, formatNumber, formatPercentage } from '../utils/responseHelpers';
 
-export class ReportGenerator {
-  private sections: ReportSectionConfig[];
-  private executiveSummaryAgent: ExecutiveSummaryAgent;
-  private financialAnalysisAgent: FinancialAnalysisAgent;
+export class ReportGenerator extends BaseAgent {
   private marketResearchAgent: MarketResearchAgent;
   private riskAssessmentAgent: RiskAssessmentAgent;
+  private report: Partial<BusinessCaseReport> = {};
 
-  constructor(sections = reportSections) {
-    this.sections = sections;
-    this.executiveSummaryAgent = new ExecutiveSummaryAgent();
-    this.financialAnalysisAgent = new FinancialAnalysisAgent();
+  constructor() {
+    super('');
     this.marketResearchAgent = new MarketResearchAgent();
     this.riskAssessmentAgent = new RiskAssessmentAgent();
   }
 
-  private initializeSections(): Partial<BusinessCaseReport> {
-    return this.sections.reduce((report, section) => ({
-      ...report,
-      [section.id]: createAgentResponse({ status: 'loading' })
-    }), {});
-  }
-
-  private async generateSectionContent(
-    section: ReportSectionConfig,
-    data: BusinessCase
-  ): Promise<AgentResponse> {
+  async generateReport(data: BusinessCase): Promise<BusinessCaseReport> {
     try {
-      let content: string;
-      
-      switch (section.id) {
-        case 'executiveSummary':
-          content = await this.executiveSummaryAgent.generateSummary(data);
-          break;
-        case 'financialAnalysis':
-          content = await this.financialAnalysisAgent.generateAnalysis(data);
-          break;
-        case 'marketResearch':
-          content = await this.marketResearchAgent.generateMarketResearch(data);
-          break;
-        case 'riskAssessment':
-          content = await this.riskAssessmentAgent.generateRiskAssessment(data);
-          break;
-        case 'summaryConclusion':
-          // Generate conclusion after all other sections are complete
-          content = await this.generateSummaryConclusion(data);
-          break;
-        default:
-          content = await section.generateContent(data);
+      // Initialize report sections
+      for (const section of reportSections) {
+        this.report[section.id as keyof BusinessCaseReport] = {
+          status: 'loading',
+          content: ''
+        };
       }
-      
-      return createAgentResponse({ status: 'complete', content });
+
+      // Generate each section in parallel
+      const promises = [
+        this.generateExecutiveSummary(data),
+        this.generateFinancialAnalysis(data),
+        this.generateMarketResearch(data),
+        this.generateRiskAssessment(data),
+        this.generateSummaryConclusion(data)
+      ];
+
+      await Promise.all(promises);
+
+      return this.report as BusinessCaseReport;
+
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      return createAgentResponse({ status: 'error', error: errorMessage });
+      console.error('Error generating report:', error);
+      throw new Error('Failed to generate business case report');
     }
   }
 
-  private async generateSummaryConclusion(data: BusinessCase): Promise<string> {
-    const prompt = `Generate a comprehensive summary and conclusion for the business case:
+  private async generateExecutiveSummary(data: BusinessCase): Promise<void> {
+    try {
+      const content = await this.generateCompletion([
+        { role: 'user', content: this.getExecutiveSummaryPrompt(data) }
+      ], 0.7);
+      this.updateSection('executiveSummary', content);
+    } catch (error) {
+      this.handleSectionError('executiveSummary', error);
+    }
+  }
+
+  private async generateFinancialAnalysis(data: BusinessCase): Promise<void> {
+    try {
+      const content = await this.generateCompletion([
+        { role: 'user', content: this.getFinancialAnalysisPrompt(data) }
+      ], 0.7);
+      this.updateSection('financialAnalysis', content);
+    } catch (error) {
+      this.handleSectionError('financialAnalysis', error);
+    }
+  }
+
+  private async generateMarketResearch(data: BusinessCase): Promise<void> {
+    try {
+      const content = await this.marketResearchAgent.generateMarketResearch(data);
+      this.updateSection('marketResearch', content);
+    } catch (error) {
+      this.handleSectionError('marketResearch', error);
+    }
+  }
+
+  private async generateRiskAssessment(data: BusinessCase): Promise<void> {
+    try {
+      const content = await this.riskAssessmentAgent.generateRiskAssessment(data);
+      this.updateSection('riskAssessment', content);
+    } catch (error) {
+      this.handleSectionError('riskAssessment', error);
+    }
+  }
+
+  private async generateSummaryConclusion(data: BusinessCase): Promise<void> {
+    try {
+      const prompt = `Generate a comprehensive summary and conclusion for the business case:
 
 Company: ${data.companyName}
 Project: ${data.projectName}
@@ -86,54 +107,77 @@ Please provide a final summary and conclusion that synthesizes all aspects of th
 including market opportunity, financial projections, risks, and strategic recommendations.
 Format the response using the same HTML structure as other sections.`;
 
-    return this.executiveSummaryAgent.generateCompletion([
-      { role: 'user', content: prompt }
-    ], 0.8);
-  }
-
-  private formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  }
-
-  private formatNumber(value: number): string {
-    return new Intl.NumberFormat('en-US').format(value);
-  }
-
-  private formatPercentage(value: number): string {
-    return `${value.toFixed(1)}%`;
-  }
-
-  async generateReport(data: BusinessCase): Promise<BusinessCaseReport> {
-    const report = this.initializeSections();
-
-    try {
-      // Generate all sections concurrently for better performance
-      const sectionResults = await Promise.all(
-        this.sections.map(section => this.generateSectionContent(section, data))
-      );
+      const content = await this.generateCompletion([
+        { role: 'user', content: prompt }
+      ], 0.8);
       
-      // Update report with results
-      this.sections.forEach((section, index) => {
-        report[section.id] = sectionResults[index];
-      });
-
-      return report as BusinessCaseReport;
+      this.updateSection('summaryConclusion', content);
     } catch (error) {
-      console.error('Error generating report:', error);
-      throw error;
+      this.handleSectionError('summaryConclusion', error);
     }
   }
 
-  addSection(section: ReportSectionConfig) {
-    this.sections.push(section);
+  private updateSection(sectionId: keyof BusinessCaseReport, content: string): void {
+    this.report[sectionId] = {
+      status: 'complete',
+      content
+    };
   }
 
-  removeSection(sectionId: string) {
-    this.sections = this.sections.filter(section => section.id !== sectionId);
+  private handleSectionError(sectionId: keyof BusinessCaseReport, error: unknown): void {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    this.report[sectionId] = {
+      status: 'error',
+      content: '',
+      error: errorMessage
+    };
+  }
+
+  private getExecutiveSummaryPrompt(data: BusinessCase): string {
+    return `Generate an executive summary for the business case:
+
+Company: ${data.companyName}
+Project: ${data.projectName}
+Industry: ${data.industry}
+Country: ${data.country}
+
+Investment Details:
+- CapEx: ${formatCurrency(data.capex)}
+- OpEx: ${formatCurrency(data.opex)}/year
+- Period: ${data.investmentPeriod} years
+- Growth Rate: ${formatPercentage(data.growthRate)}
+- ARPU: ${formatCurrency(data.arpu)}/month
+- Initial Subscribers: ${formatNumber(data.subscribers)}
+- Expected Revenue: ${formatCurrency(data.expectedRevenue)}/year
+
+Please provide a concise executive summary that highlights the key aspects of the business case.
+Format the response using HTML with appropriate headings and paragraphs.`;
+  }
+
+  private getFinancialAnalysisPrompt(data: BusinessCase): string {
+    return `Generate a financial analysis for the business case:
+
+Company: ${data.companyName}
+Project: ${data.projectName}
+Industry: ${data.industry}
+Country: ${data.country}
+
+Investment Details:
+- CapEx: ${formatCurrency(data.capex)}
+- OpEx: ${formatCurrency(data.opex)}/year
+- Period: ${data.investmentPeriod} years
+- Growth Rate: ${formatPercentage(data.growthRate)}
+- ARPU: ${formatCurrency(data.arpu)}/month
+- Initial Subscribers: ${formatNumber(data.subscribers)}
+- Expected Revenue: ${formatCurrency(data.expectedRevenue)}/year
+
+Please provide a detailed financial analysis including:
+1. Investment overview
+2. Revenue projections
+3. Cost analysis
+4. Key financial metrics
+5. ROI calculations
+
+Format the response using HTML with appropriate headings, paragraphs, and lists.`;
   }
 }

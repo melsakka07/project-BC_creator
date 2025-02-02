@@ -1,16 +1,19 @@
 import React from 'react';
-import { Brain, Download, FileSpreadsheet } from 'lucide-react';
+import { Brain, Download } from 'lucide-react';
 import InputForm from './components/InputForm';
 import ReportSection from './components/ReportSection';
 import GraphSection from './components/GraphSection';
 import type { BusinessCase, BusinessCaseReport, BusinessCaseParameters } from './types';
 import { ReportGenerator } from './services/reportGenerator';
-import { PdfGenerator } from './services/pdfGenerator';
+import { PDFGenerator } from './services/pdfGenerator';
 import { reportSections } from './config/reportSections';
 import { AlertCircle } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import LoadingSpinner from './components/LoadingSpinner';
+import Header from './components/Header';
 
 const reportGenerator = new ReportGenerator();
-const pdfGenerator = new PdfGenerator();
+const pdfGenerator = new PDFGenerator();
 
 function App() {
   const [apiError, setApiError] = React.useState<string | null>(null);
@@ -30,11 +33,22 @@ function App() {
     growthRate: true,
     arpu: true
   });
+  const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
 
-  const handleParameterToggle = (parameter: keyof BusinessCaseParameters) => {
+  React.useEffect(() => {
+    document.documentElement.classList.add(theme);
+  }, []);
+
+  const handleParameterToggle = (parameter: string | number | symbol) => {
     setParameters(prev => ({
       ...prev,
-      [parameter]: !prev[parameter]
+      [parameter]: !prev[parameter as keyof BusinessCaseParameters]
     }));
   };
 
@@ -90,7 +104,7 @@ function App() {
           ${reportSections.map(section => `
             <div class="section">
               <h2>${section.title}</h2>
-              <pre>${report[section.id].content}</pre>
+              <pre>${report[section.id as keyof BusinessCaseReport].content}</pre>
             </div>
           `).join('')}
         </body>
@@ -141,159 +155,128 @@ function App() {
     }
   };
 
+  const handleThemeToggle = React.useCallback(() => {
+    setTheme(prevTheme => {
+      const newTheme = prevTheme === 'light' ? 'dark' : 'light';
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(newTheme);
+      localStorage.setItem('theme', newTheme);
+      return newTheme;
+    });
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary-400 to-secondary-400 rounded-xl blur-xl opacity-30 animate-float"></div>
-              <FileSpreadsheet className="h-16 w-16 text-primary-600 relative animate-float" />
-            </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 
+        dark:from-neutral-900 dark:to-neutral-800 transition-colors duration-300">
+        <Header theme={theme} onThemeToggle={handleThemeToggle} />
+        
+        <main className="relative">
+          {/* Background decoration */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400/10 
+              dark:bg-primary-400/5 rounded-full blur-3xl transform rotate-12 animate-float"></div>
+            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-400/10 
+              dark:bg-secondary-400/5 rounded-full blur-3xl transform -rotate-12 animate-float 
+              animation-delay-2000"></div>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-4 animate-gradient">
-            Business Case Creator
-          </h1>
-          <p className="text-lg text-neutral-600 max-w-2xl mx-auto font-medium">
-            Create professional business cases powered by AI agents
-          </p>
-          {apiError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg max-w-2xl mx-auto">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-red-700 text-sm font-medium">
-                    Configuration Error: {apiError}
-                  </p>
-                  <div className="mt-2 text-red-600 text-sm space-y-2">
-                    <p>Please add your API keys to the .env file:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>
-                        Create an OpenAI API key at{' '}
-                        <a
-                          href="https://platform.openai.com/api-keys"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline hover:text-red-800"
-                        >
-                          platform.openai.com/api-keys
-                        </a>
-                      </li>
-                      <li>
-                        Create a Brave Search API key at{' '}
-                        <a
-                          href="https://brave.com/search/api/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline hover:text-red-800"
-                        >
-                          brave.com/search/api
-                        </a>
-                      </li>
-                      <li>Add to your .env file:
-                        <pre className="mt-1 p-2 bg-red-100 rounded text-xs font-mono">
-                          VITE_OPENAI_API_KEY=your_openai_key_here{'\n'}
-                          VITE_BRAVE_API_KEY=your_brave_key_here{'\n'}
-                          VITE_BRAVE_API_ENDPOINT=https://api.search.brave.com/res/v1/web/search
-                        </pre>
-                      </li>
-                    </ol>
+
+          {/* Main content */}
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 
+            space-y-8 sm:space-y-12">
+            {apiError && (
+              <div className="animate-slideIn">
+                <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border 
+                  border-red-100 dark:border-red-900/30 shadow-lg">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+                    <p className="ml-3 text-red-600 dark:text-red-400">{apiError}</p>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          {apiError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg max-w-2xl mx-auto">
-              <p className="text-red-700 text-sm">
-                <strong>Configuration Error:</strong> {apiError}
-              </p>
-              <p className="text-red-600 text-xs mt-2">
-                Please add your API keys to the .env file:
-                <br />
-                1. Create an OpenAI API key at{' '}
-                <a
-                  href="https://platform.openai.com/api-keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-red-800"
-                >
-                  platform.openai.com/api-keys
-                </a>
-                <br />
-                2. Create a Brave Search API key at{' '}
-                <a
-                  href="https://brave.com/search/api/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-red-800"
-                >
-                  brave.com/search/api
-                </a>
-              </p>
-            </div>
-          )}
-        </div>
+            )}
 
-        <div className="flex flex-col items-center mb-12">
-          <InputForm
-            onSubmit={handleSubmit}
-            isLoading={isGenerating}
-            parameters={parameters}
-            onParameterToggle={handleParameterToggle}
-          />
-        </div>
-
-        {report && (
-          <div className="space-y-6 sm:space-y-8">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-400 to-secondary-400 rounded-lg blur-lg opacity-30"></div>
-                <Brain className="h-8 w-8 text-primary-600 relative" />
-              </div>
-              <h2 className="text-3xl font-bold text-neutral-800">
-                Generated Business Case
-              </h2>
-              <div className="ml-auto flex gap-3">
-                <button
-                  onClick={handleDownloadPdf}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl
-                    text-white bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600
-                    focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-                    shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </button>
-                <button
-                  onClick={handleDownloadHtml}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl
-                  text-white bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600
-                  focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-                  shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download HTML
-                </button>
-              </div>
+            <div className="animate-fadeIn">
+              <InputForm
+                onSubmit={handleSubmit}
+                isLoading={isGenerating}
+                parameters={parameters}
+                onParameterToggle={handleParameterToggle}
+                theme={theme}
+              />
             </div>
-            
-            {reportSections.map(section => (
-              <React.Fragment key={section.id}>
-                {section.id === 'financialAnalysis' && (
-                  formData && <GraphSection data={formData} />
-                )}
-                <ReportSection
-                  title={section.title}
-                  icon={section.icon}
-                  response={report[section.id]}
-                />
-              </React.Fragment>
-            ))}
+
+            {isGenerating && (
+              <div className="fixed inset-0 bg-black/20 dark:bg-black/40 
+                backdrop-blur-sm z-50 flex items-center justify-center">
+                <div className="bg-white dark:bg-neutral-800 rounded-2xl p-6 
+                  shadow-xl dark:shadow-neutral-900/50 max-w-sm w-full mx-4">
+                  <div className="flex flex-col items-center text-center">
+                    <LoadingSpinner size="lg" className="mb-4" />
+                    <h3 className="text-lg font-medium text-neutral-900 
+                      dark:text-neutral-100 mb-2">
+                      Generating Business Case
+                    </h3>
+                    <p className="text-neutral-600 dark:text-neutral-400 text-sm">
+                      This may take a few moments...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {report && (
+              <div className="space-y-6 sm:space-y-8 animate-fadeIn">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary-400 to-secondary-400 rounded-lg blur-lg opacity-30"></div>
+                    <Brain className="h-8 w-8 text-primary-600 relative" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-neutral-800">
+                    Generated Business Case
+                  </h2>
+                  <div className="ml-auto flex gap-3">
+                    <button
+                      onClick={handleDownloadPdf}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl
+                        text-white bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600
+                        focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+                        shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </button>
+                    <button
+                      onClick={handleDownloadHtml}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl
+                      text-white bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600
+                      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+                      shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download HTML
+                    </button>
+                  </div>
+                </div>
+                
+                {reportSections.map(section => (
+                  <React.Fragment key={section.id}>
+                    {section.id === 'financialAnalysis' && (
+                      formData && <GraphSection data={formData} />
+                    )}
+                    <ReportSection
+                      title={section.title}
+                      icon={section.icon}
+                      response={report[section.id as keyof BusinessCaseReport]}
+                    />
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </main>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 

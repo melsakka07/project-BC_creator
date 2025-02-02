@@ -9,7 +9,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  ChartOptions
+  ChartOptions,
+  type ChartData
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import type { BusinessCase } from '../types';
@@ -33,6 +34,7 @@ interface GraphSectionProps {
 export default function GraphSection({ data }: GraphSectionProps) {
   const projections = calculateProjections(data);
   const years = Array.from({ length: data.investmentPeriod }, (_, i) => `Year ${i + 1}`);
+  const isDarkMode = document.documentElement.classList.contains('dark');
 
   const baseChartOptions = {
     responsive: true,
@@ -43,25 +45,55 @@ export default function GraphSection({ data }: GraphSectionProps) {
     plugins: {
       legend: {
         position: 'top' as const,
+        labels: {
+          color: isDarkMode ? '#e4e4e7' : '#3f3f46',
+          font: {
+            size: 12,
+            family: 'system-ui, sans-serif',
+          },
+        },
+      },
+      title: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: isDarkMode ? '#27272a' : '#ffffff',
+        titleColor: isDarkMode ? '#e4e4e7' : '#18181b',
+        bodyColor: isDarkMode ? '#d4d4d8' : '#27272a',
+        borderColor: isDarkMode ? '#3f3f46' : '#e4e4e7',
+        borderWidth: 1,
+        padding: 12,
+        bodyFont: {
+          size: 12,
+          family: 'system-ui, sans-serif',
+        },
+        titleFont: {
+          size: 14,
+          family: 'system-ui, sans-serif',
+          weight: '600',
+        },
+        displayColors: true,
+        callbacks: {
+          label: (context) => {
+            const value = context.raw as number;
+            return `${context.dataset.label}: $${value.toLocaleString()}`;
+          },
+        },
       },
     }
   };
 
   const growthChartOptions: ChartOptions<'line'> = {
     ...baseChartOptions,
-    plugins: {
-      ...baseChartOptions.plugins,
-      title: {
-        display: true,
-        text: 'Business Case Projections',
-        color: '#27272a',
-        font: {
-          size: 16,
-          weight: 'bold'
-        }
-      }
-    },
     scales: {
+      x: {
+        grid: {
+          color: isDarkMode ? '#27272a' : '#e4e4e7',
+        },
+        ticks: {
+          color: isDarkMode ? '#d4d4d8' : '#3f3f46',
+        },
+      },
       y: {
         type: 'linear' as const,
         display: true,
@@ -70,7 +102,14 @@ export default function GraphSection({ data }: GraphSectionProps) {
           display: true,
           text: 'Number of Subscribers',
           color: '#0284c7'
-        }
+        },
+        grid: {
+          color: isDarkMode ? '#27272a' : '#e4e4e7',
+        },
+        ticks: {
+          color: isDarkMode ? '#d4d4d8' : '#3f3f46',
+          callback: (value) => value.toLocaleString(),
+        },
       },
       y1: {
         type: 'linear' as const,
@@ -90,18 +129,6 @@ export default function GraphSection({ data }: GraphSectionProps) {
 
   const profitChartOptions: ChartOptions<'bar'> = {
     ...baseChartOptions,
-    plugins: {
-      ...baseChartOptions.plugins,
-      title: {
-        display: true,
-        text: 'Yearly Profitability',
-        color: '#27272a',
-        font: {
-          size: 16,
-          weight: 'bold'
-        }
-      }
-    },
     scales: {
       y: {
         type: 'linear' as const,
@@ -110,25 +137,20 @@ export default function GraphSection({ data }: GraphSectionProps) {
           display: true,
           text: 'Profit (USD)',
           color: '#059669'
-        }
+        },
+        grid: {
+          color: isDarkMode ? '#27272a' : '#e4e4e7',
+        },
+        ticks: {
+          color: isDarkMode ? '#d4d4d8' : '#3f3f46',
+          callback: (value) => value.toLocaleString(),
+        },
       }
     }
   };
 
   const breakEvenChartOptions: ChartOptions<'line'> = {
     ...baseChartOptions,
-    plugins: {
-      ...baseChartOptions.plugins,
-      title: {
-        display: true,
-        text: 'Break-Even Analysis',
-        color: '#27272a',
-        font: {
-          size: 16,
-          weight: 'bold'
-        }
-      }
-    },
     scales: {
       y: {
         type: 'linear' as const,
@@ -137,12 +159,19 @@ export default function GraphSection({ data }: GraphSectionProps) {
           display: true,
           text: 'Cumulative Profit (USD)',
           color: '#0d9488'
-        }
+        },
+        grid: {
+          color: isDarkMode ? '#27272a' : '#e4e4e7',
+        },
+        ticks: {
+          color: isDarkMode ? '#d4d4d8' : '#3f3f46',
+          callback: (value) => value.toLocaleString(),
+        },
       }
     }
   };
 
-  const growthChartData = {
+  const growthChartData: ChartData<'line'> = {
     labels: years,
     datasets: [
       {
@@ -193,16 +222,12 @@ export default function GraphSection({ data }: GraphSectionProps) {
   const breakEvenYear = projections.cumulativeProfit.findIndex(profit => profit >= 0) + 1;
 
   return (
-    <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20
-      hover:shadow-xl transition-all duration-300 hover:bg-white/80">
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold text-neutral-800 mb-2">
-          Growth & Revenue Projections
-        </h3>
-        <p className="text-neutral-600">
-          Projected subscriber growth and revenue over {data.investmentPeriod} years
-        </p>
-      </div>
+    <div className="bg-white/70 dark:bg-neutral-800/50 backdrop-blur-sm rounded-2xl 
+      shadow-lg dark:shadow-neutral-900/30 p-4 sm:p-8 border border-white/20 
+      dark:border-neutral-700/30">
+      <h3 className="text-lg sm:text-xl font-semibold text-neutral-800 dark:text-neutral-100 mb-6">
+        Financial Projections
+      </h3>
       <div className="w-full aspect-[16/9]">
         <Line options={growthChartOptions} data={growthChartData} />
       </div>

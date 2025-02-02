@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import type { BusinessCase } from './index';
+import type { BusinessCase, BusinessCaseReport } from './index';
 
 export interface ReportSectionConfig {
   id: string;

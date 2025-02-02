@@ -1,23 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    }
+  },
   server: {
     proxy: {
-      '/api/brave-search': {
-        target: 'https://api.search.brave.com/res/v1/web/search',
+      '/api': {
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/brave-search/, ''),
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            // Forward the API key from the client request
-            const apiKey = req.headers['x-subscription-token'];
-            if (apiKey) {
-              proxyReq.setHeader('X-Subscription-Token', apiKey);
-            }
-          });
-        }
       }
     }
   },
